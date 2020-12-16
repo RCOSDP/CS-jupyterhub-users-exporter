@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import subprocess, socket, argparse, os, asyncio, sys
+import subprocess, argparse, os
 import urllib
 import requests
 import time
@@ -10,15 +10,13 @@ metric_labels = ['user', 'org']
 api_host = 'http://127.0.0.1:8000'
 api_url = api_host + '/hub/api'
 token = '7db0e93d8a314e3caf12c2461aa739da'
+request_headers = {'Authorization': 'token %s' % token, }
 
-
-# Run tcpdump and stream the packets out
-def stream_packets():
+def monitor_metrics():
     while True:
         try:
             r = requests.get(api_url + '/users',
-                             headers={'Authorization': 'token %s' % token, }
-            )
+                             headers=request_headers)
             r.raise_for_status()
             users = r.json()
 
@@ -29,19 +27,26 @@ def stream_packets():
                 }
                 try: 
                     kernel_num = 0
+                    terminal_num = 0
                     for k, server in user['servers'].items():
                         r = requests.get(api_host + server['url'] + 'api/kernels',
-                                         headers={'Authorization': 'token %s' % token,}
+                                         headers=request_headers
                         )
                         r.raise_for_status()
                         kernel_num += len(r.json())
+                        r = requests.get(api_host + server['url'] + 'api/terminals',
+                                         headers=request_headers
+                        )
+                        r.raise_for_status()
+                        terminal_num += len(r.json())                        
                     server_num_gauge.labels(**labels).set(len(user['servers']))
                     kernel_num_gauge.labels(**labels).set(kernel_num)
+                    terminal_num_gauge.labels(**labels).set(terminal_num)
                 except Exception as e:
                     print(f'Failed to retrieve user information: {e}')
         except Exception as e:
             print(f'Failed to retrieve hub information: {e}')
-        time.sleep(60)
+        time.sleep(10)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -53,6 +58,7 @@ if __name__ == '__main__':
 
     server_num_gauge = Gauge(f'{opts.metric_prefix}_server_num', 'Number of servers for each user', metric_labels)
     kernel_num_gauge = Gauge(f'{opts.metric_prefix}_kernel_num', 'Number of kernels for each user', metric_labels)
+    terminal_num_gauge = Gauge(f'{opts.metric_prefix}_terminal_num', 'Number of terminals for each user', metric_labels)
     
     start_http_server(int(opts.port))
-    asyncio.run(stream_packets())
+    monitor_metrics()
