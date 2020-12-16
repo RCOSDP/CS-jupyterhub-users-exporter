@@ -7,10 +7,11 @@ from prometheus_client import Counter, start_http_server, Gauge
 
 metric_labels = ['user', 'org']
 
-api_host = 'http://127.0.0.1:8000'
+api_host = 'http://' + os.environ.get('JUPYTER_HUB_HOST', '127.0.0.1:8000')
 api_url = api_host + '/hub/api'
-token = '7db0e93d8a314e3caf12c2461aa739da'
+token = os.environ.get('JUPYTER_HUB_API_TOKEN', '')
 request_headers = {'Authorization': 'token %s' % token, }
+interval = int(os.environ.get('JUE_INTERVAL', 10))
 
 def monitor_metrics():
     while True:
@@ -21,10 +22,17 @@ def monitor_metrics():
             users = r.json()
 
             for user in users:
-                labels = {
-                    'user': user['name'],
-                    'org': 'fuga',
-                }
+                if '@' in user['name']:
+                    (name, org) = user['name'].rsplit('@')
+                    labels = {
+                        'user': name,
+                        'org': org,
+                    }
+                else:
+                    labels = {
+                        'user': user['name'],
+                        'org': 'none',
+                    }
                 try: 
                     kernel_num = 0
                     terminal_num = 0
@@ -46,7 +54,7 @@ def monitor_metrics():
                     print(f'Failed to retrieve user information: {e}')
         except Exception as e:
             print(f'Failed to retrieve hub information: {e}')
-        time.sleep(10)
+        time.sleep(interval)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -61,4 +69,5 @@ if __name__ == '__main__':
     terminal_num_gauge = Gauge(f'{opts.metric_prefix}_terminal_num', 'Number of terminals for each user', metric_labels)
     
     start_http_server(int(opts.port))
+    print(f'Started to monitor JupyterHub users...')
     monitor_metrics()
