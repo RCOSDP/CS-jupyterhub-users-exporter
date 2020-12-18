@@ -1,8 +1,13 @@
 ## How to use
 
+### Set environment variables
+- `JUPYTER_HUB_HOST`: Host and port (default: `127.0.0.1:8000`)
+- `JUPYTER_HUB_API_TOKEN`: API token of JupyterHub (can be created on the JupyterHub Admin UI)
+- `JUE_INTERVAL`: Time interval to retrieve information in seconds (default: 10)
+
 ### To execute directly 
 
-```python jupyterhub-users-exporter.py -p 8070```
+```python jupyterhub_users_exporter.py -p 8070```
 
 ### By docker 
 
