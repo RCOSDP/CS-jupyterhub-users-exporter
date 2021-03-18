@@ -33,16 +33,19 @@ def monitor_metrics(api_host, token, interval):
                     kernel_num = 0
                     terminal_num = 0
                     for k, server in user['servers'].items():
-                        r = requests.get(api_host + server['url'] + 'api/kernels',
-                                         headers=request_headers
-                        )
-                        r.raise_for_status()
-                        kernel_num += len(r.json())
-                        r = requests.get(api_host + server['url'] + 'api/terminals',
-                                         headers=request_headers
-                        )
-                        r.raise_for_status()
-                        terminal_num += len(r.json())                        
+                        try:
+                            r = requests.get(api_host + server['url'] + 'api/kernels',
+                                             headers=request_headers
+                            )
+                            r.raise_for_status()
+                            kernel_num += len(r.json())
+                            r = requests.get(api_host + server['url'] + 'api/terminals',
+                                             headers=request_headers
+                            )
+                            r.raise_for_status()
+                            terminal_num += len(r.json())
+                        except requests.exceptions.HTTPError as e:
+                            print(f'Failed to retrieve server information: {e}')
                     server_num_gauge.labels(**labels).set(len(user['servers']))
                     kernel_num_gauge.labels(**labels).set(kernel_num)
                     terminal_num_gauge.labels(**labels).set(terminal_num)
