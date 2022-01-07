@@ -7,7 +7,7 @@ from prometheus_client import Counter, start_http_server, Gauge
 
 metric_labels = ['user', 'org']
 
-def monitor_metrics(api_host, token, only_servers):
+def monitor_metrics(api_host, token, with_details):
     try:
         api_url = api_host + '/hub/api'
         request_headers = {'Authorization': 'token %s' % token, }
@@ -33,7 +33,7 @@ def monitor_metrics(api_host, token, only_servers):
                 terminal_num = 0
                 for k, server in user['servers'].items():
                     server_num_gauge.labels(**labels).set(len(user['servers']))
-                    if not only_servers:
+                    if with_details:
                         try:
                             r = requests.get(api_host + server['url'] + 'api/kernels',
                                              headers=request_headers
@@ -78,5 +78,5 @@ if __name__ == '__main__':
     start_http_server(int(opts.port))
     print(f'Started to monitor JupyterHub users...')
     while True:
-        monitor_metrics(f'http://{opts.jupyterhub_host}:{opts.jupyterhub_port}', opts.jupyterhub_token, os.environ.get('JUE_ONLY_SERVERS', '').lower() == 'true')
+        monitor_metrics(f'http://{opts.jupyterhub_host}:{opts.jupyterhub_port}', opts.jupyterhub_token, os.environ.get('JUE_WITH_DETAILS', '').lower() == 'true')
         time.sleep(opts.interval)
