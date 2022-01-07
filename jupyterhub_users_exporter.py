@@ -7,7 +7,7 @@ from prometheus_client import Counter, start_http_server, Gauge
 
 metric_labels = ['user', 'org']
 
-def monitor_metrics(api_host, token):
+def monitor_metrics(api_host, token, only_servers):
     try:
         api_url = api_host + '/hub/api'
         request_headers = {'Authorization': 'token %s' % token, }
@@ -32,22 +32,23 @@ def monitor_metrics(api_host, token):
                 kernel_num = 0
                 terminal_num = 0
                 for k, server in user['servers'].items():
-                    try:
-                        r = requests.get(api_host + server['url'] + 'api/kernels',
-                                         headers=request_headers
-                        )
-                        r.raise_for_status()
-                        kernel_num += len(r.json())
-                        r = requests.get(api_host + server['url'] + 'api/terminals',
-                                         headers=request_headers
-                        )
-                        r.raise_for_status()
-                        terminal_num += len(r.json())
-                    except requests.exceptions.HTTPError as e:
-                        print(f'Failed to retrieve server information: {e}')
                     server_num_gauge.labels(**labels).set(len(user['servers']))
-                    kernel_num_gauge.labels(**labels).set(kernel_num)
-                    terminal_num_gauge.labels(**labels).set(terminal_num)
+                    if not only_servers:
+                        try:
+                            r = requests.get(api_host + server['url'] + 'api/kernels',
+                                             headers=request_headers
+                            )
+                            r.raise_for_status()
+                            kernel_num += len(r.json())
+                            r = requests.get(api_host + server['url'] + 'api/terminals',
+                                             headers=request_headers
+                            )
+                            r.raise_for_status()
+                            terminal_num += len(r.json())
+                        except requests.exceptions.HTTPError as e:
+                            print(f'Failed to retrieve server information: {e}')
+                        kernel_num_gauge.labels(**labels).set(kernel_num)
+                        terminal_num_gauge.labels(**labels).set(terminal_num)
             except Exception as e:
                 print(f'Failed to retrieve user information: {e}')
     except Exception as e:
@@ -70,11 +71,12 @@ if __name__ == '__main__':
     parser.add_argument('--jupyterhub_host', default=os.environ.get('JUPYTER_HUB_HOST', '127.0.0.1'))
     parser.add_argument('--jupyterhub_port', default=os.environ.get('JUPYTER_HUB_PORT', '8000'))
     parser.add_argument('--jupyterhub_token', default=os.environ.get('JUPYTER_HUB_API_TOKEN', ''))
+    parser.add_argument('--servers_only', action='store_true')
     opts = parser.parse_args()
 
     server_num_gauge, kernel_num_gauge, terminal_num_gauge = get_gauges(opts.metrics_prefix)
     start_http_server(int(opts.port))
     print(f'Started to monitor JupyterHub users...')
     while True:
-        monitor_metrics(f'http://{opts.jupyterhub_host}:{opts.jupyterhub_port}', opts.jupyterhub_token)
+        monitor_metrics(f'http://{opts.jupyterhub_host}:{opts.jupyterhub_port}', opts.jupyterhub_token, os.environ.get('JUE_ONLY_SERVERS', '').lower() == 'true')
         time.sleep(opts.interval)
